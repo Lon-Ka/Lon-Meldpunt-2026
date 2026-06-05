@@ -187,12 +187,17 @@ tr:last-child td{border-bottom:none}tr:hover td{background:var(--blauw-bg)}
       </div>
       <div id="ao-all">
         <div class="tw"><table><colgroup><col style="width:90px"><col style="width:130px"><col style="width:90px"><col style="width:120px"><col style="width:80px"><col style="width:90px"></colgroup>
-          <tr><th>Ref</th><th>Personeelslid</th><th>Letsel</th><th>School</th><th>AGODI</th><th>Status</th></tr>
+          <tr><th>Ref</th><th>Personeelslid</th><th>Letsel</th><th>School</th><th>AGODI</th><th>Status</th><th id="ao-acties-hdr" style="display:none">Actie</th></tr>
           <tbody id="ao-tabel"><tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px">Laden…</td></tr></tbody>
         </table></div>
       </div>
       <div id="ao-open" style="display:none"><p style="font-size:12px;color:var(--muted);padding:20px">Filter actief: in behandeling</p></div>
-      <div id="ao-agodi" style="display:none"><p style="font-size:12px;color:var(--muted);padding:20px">Filter actief: AGODI vereist</p></div>
+      <div id="ao-agodi" style="display:none">
+        <div class="tw"><table><colgroup><col style="width:90px"><col style="width:130px"><col style="width:90px"><col style="width:120px"><col style="width:80px"><col style="width:130px"></colgroup>
+          <tr><th>Ref</th><th>Personeelslid</th><th>Letsel</th><th>School</th><th>AGODI</th><th>Actie</th></tr>
+          <tbody id="ao-agodi-tabel"><tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px">Laden…</td></tr></tbody>
+        </table></div>
+      </div>
       <div id="ao-af" style="display:none"><p style="font-size:12px;color:var(--muted);padding:20px">Filter actief: afgewerkt</p></div>
     </div>
 
@@ -208,7 +213,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:var(--blauw-bg)}
     <div class="screen" id="screen-lo">
       <div class="alert al-b">⚠️ Leerlingengegevens — extra GDPR-bescherming. Niet printen of delen buiten bevoegde personen.</div>
       <div class="tw"><table><colgroup><col style="width:90px"><col style="width:100px"><col style="width:90px"><col style="width:120px"><col style="width:90px"><col style="width:90px"></colgroup>
-        <tr><th>Ref</th><th>Klas</th><th>Letsel</th><th>School</th><th>Ouders verwittigd</th><th>Status</th></tr>
+        <tr><th>Ref</th><th>Klas</th><th>Letsel</th><th>School</th><th>Ouders verwittigd</th><th>Status</th><th id="lo-acties-hdr">Actie</th></tr>
         <tbody id="lo-tabel"><tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px">Laden…</td></tr></tbody>
       </table></div>
     </div>
@@ -341,14 +346,23 @@ async function initApp(acc) {
   document.getElementById('b-av').textContent = avText;
 
   // Beperk schoolfilter als directie van 1 school
-  if (huidigeBeheerder.rol === 'directie' && huidigeBeheerder.school) {
+  if (['directie','zorg','secretariaat'].includes(huidigeBeheerder.rol) && huidigeBeheerder.school) {
     const sf = document.getElementById('school-filter');
     sf.value = huidigeBeheerder.school; sf.disabled = true;
     huidigSchool = huidigeBeheerder.school;
   }
   // Verberg welzijn voor niet-geautoriseerden
-  if (!['admin','directie','zorg'].includes(huidigeBeheerder.rol)) {
+  if (!['admin','directie','zorg','staf'].includes(huidigeBeheerder.rol)) {
     document.getElementById('nav-welzijn').style.display='none';
+  }
+  // AGODI actiekolom: enkel voor admin en staf
+  if (['admin','staf'].includes(huidigeBeheerder.rol)) {
+    document.getElementById('ao-acties-hdr').style.display='';
+  }
+  // LO verzekeringskolom: voor admin, staf en secretariaat
+  // Werkopdracht knop: voor admin, staf en secretariaat
+  if (['admin','staf','secretariaat'].includes(huidigeBeheerder.rol)) {
+    document.getElementById('wo-nieuw-btn').style.display='block';
   }
 
   laadDashboard();
@@ -480,10 +494,20 @@ function show(s) {
 async function laadAO() {
   const items = await laadLijst('ao','veiligheid');
   const ao = items.filter(i=>i.TypeMelding==='Arbeidsongeval'||!i.TypeMelding);
+  const kanAgodi = ['admin','staf'].includes(huidigeBeheerder?.rol);
   document.getElementById('ao-tabel').innerHTML = ao.map((i,idx)=>`<tr>
     <td class="cl">${ref('AO',idx+1)}</td><td>${i.Naam||'—'}</td><td>${i.Letsel||'—'}</td>
     <td>${schoolNaam(i._school)}</td><td>${i.AgodiVereist?'<span class="badge b-amb">Vereist</span>':'—'}</td>
-    <td>${statusBadge(i.Status)}</td></tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px">Geen arbeidsongevallen gevonden</td></tr>';
+    <td>${statusBadge(i.Status)}</td>
+    ${kanAgodi&&i.AgodiVereist?`<td style="display:''"><button class="btn btn-sm btn-p" onclick="stuurAgodiDoor('${ref('AO',idx+1)}','${i.Naam||''}','${i._school}')">📤 AGODI</button></td>`:'<td></td>'}
+    </tr>`).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">Geen arbeidsongevallen gevonden</td></tr>';
+  // Vul AGODI tab ook in
+  const agodiItems = ao.filter(i=>i.AgodiVereist&&i.Status!=='Afgewerkt');
+  document.getElementById('ao-agodi-tabel').innerHTML = agodiItems.map((i,idx)=>`<tr>
+    <td class="cl">${ref('AO',idx+1)}</td><td>${i.Naam||'—'}</td><td>${i.Letsel||'—'}</td>
+    <td>${schoolNaam(i._school)}</td><td><span class="badge b-amb">Vereist</span></td>
+    <td>${kanAgodi?`<button class="btn btn-sm btn-p" onclick="stuurAgodiDoor('${ref('AO',idx+1)}','${i.Naam||''}','${i._school}')">📤 Doorsturen naar AGODI</button>`:'—'}</td>
+    </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px">Geen openstaande AGODI-aangiftes</td></tr>';
 }
 async function laadEHBO() {
   const items = await laadLijst('ehbo','veiligheid');
@@ -495,10 +519,13 @@ async function laadEHBO() {
 async function laadLO() {
   const items = await laadLijst('lo','veiligheid');
   const lo = items.filter(i=>i.TypeMelding==='Leerlingongeval');
+  const kanVerzeker = ['admin','staf','secretariaat'].includes(huidigeBeheerder?.rol);
   document.getElementById('lo-tabel').innerHTML = lo.map((i,idx)=>`<tr>
     <td class="cl">${ref('LO',idx+1)}</td><td>${i.Omschrijving?.substring(0,20)||'—'}</td><td>${i.Letsel||'—'}</td>
     <td>${schoolNaam(i._school)}</td><td>${i.OudersVerwittigd?'<span class="badge b-grn">Ja</span>':'<span class="badge b-red">Nee</span>'}</td>
-    <td>${statusBadge(i.Status)}</td></tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px">Geen leerlingenongevallen</td></tr>';
+    <td>${statusBadge(i.Status)}</td>
+    <td>${kanVerzeker&&i.Letsel?`<button class="btn btn-sm btn-p" onclick="stuurVerzekering('${ref('LO',idx+1)}','${i._school}')">📤 Verzekering</button>`:'—'}</td>
+    </tr>`).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">Geen leerlingenongevallen</td></tr>';
 }
 async function laadRisico() {
   const items = await laadLijst('risico','veiligheid');
@@ -542,6 +569,58 @@ function stab(el, contentId) {
 }
 
 function exportExcel() { alert('Export functie — koppelen aan Office Scripts of Power Automate flow'); }
+
+function toonNieuweWerkopdracht() {
+  document.getElementById('wo-nieuw-form').style.display = 'block';
+}
+
+async function slaWerkopdracht() {
+  const omschr = document.getElementById('wo-omschr').value;
+  const school = document.getElementById('wo-school').value;
+  const ernst  = document.getElementById('wo-ernst').value;
+  if (!omschr) { alert('Vul een omschrijving in'); return; }
+  const listId = CFG.lists[`veiligheid_${school}`]; // Werkopdrachten opslaan als veiligheidsitem type Werkopdracht
+  try {
+    const now = new Date();
+    await graphPost(`/sites/${CFG.siteId}/lists/${listId}/items`, {
+      fields: { Title: `WO-${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(Math.floor(Math.random()*90)+10)}`,
+        TypeMelding: 'Werkopdracht', School: school, Omschrijving: omschr,
+        Ernst: ernst, Status: 'Openstaand', Ingediend: now.toISOString(), IngediendDoor: huidigeBeheerder.email }
+    });
+    alert('Werkopdracht aangemaakt');
+    document.getElementById('wo-nieuw-form').style.display = 'none';
+    document.getElementById('wo-omschr').value = '';
+  } catch(e) { alert('Fout: ' + e.message); }
+}
+
+async function stuurAgodiDoor(ref, naam, school) {
+  // Opent AGODI-formulier in nieuw venster (of stuur e-mail naar secretariaat)
+  const body = `AGODI-aangifte voor:\n\nRef: ${ref}\nPersoon: ${naam}\nSchool: ${schoolNaam(school)}\n\nGelieve dit dossier in te dienen via het AGODI-portaal.`;
+  try {
+    await graphPost('/me/sendMail', {
+      message: {
+        subject: `[LON-Meldpunt] AGODI aangifte — ${ref} — ${schoolNaam(school)}`,
+        body: { contentType: 'Text', content: body },
+        toRecipients: [{ emailAddress: { address: CFG.directieEmails[school] || 'secretariaat@londerwijs.be' } }]
+      }, saveToSentItems: false
+    });
+    alert(`AGODI-melding doorgestuurd voor ${ref}`);
+  } catch(e) { alert('Fout bij doorsturen: ' + e.message); }
+}
+
+async function stuurVerzekering(ref, school) {
+  const body = `Verzekeringsmelding leerlingongeval:\n\nRef: ${ref}\nSchool: ${schoolNaam(school)}\n\nGelieve dit dossier door te sturen naar Ethias.`;
+  try {
+    await graphPost('/me/sendMail', {
+      message: {
+        subject: `[LON-Meldpunt] Verzekeringsmelding leerlingongeval — ${ref}`,
+        body: { contentType: 'Text', content: body },
+        toRecipients: [{ emailAddress: { address: CFG.directieEmails[school] || 'secretariaat@londerwijs.be' } }]
+      }, saveToSentItems: false
+    });
+    alert(`Verzekeringsmelding doorgestuurd voor ${ref}`);
+  } catch(e) { alert('Fout bij doorsturen: ' + e.message); }
+}
 
 window.addEventListener('load', async () => {
   await msalClient.initialize();
