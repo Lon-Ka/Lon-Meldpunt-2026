@@ -577,77 +577,60 @@ const MSGS={
 const PREFIXES={AO:'AO',EH:'EH',LO:'LO',RI:'RI',WE:'WE',AG:'AG',ES:'ES'};
 
 async function doSubmit(prefix, pijler) {
-  const school = document.getElementById('school-form')?.value || huidigSchool;
-  const listType = pijler==='w'?'welzijn':pijler==='i'?'incidenten':'veiligheid';
-  const listKey = listType + '_' + school;
-  const listId = CFG.lists[listKey];
-  const now = new Date();
-  const pfx = {AO:'AO',EH:'EH',LO:'LO',RI:'RI',WE:'WE',AG:'AG',ES:'ES'};
-  const ref = (pfx[prefix]||'ME') + '-' + now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(Math.floor(Math.random()*90)+10);
+  var school = (document.getElementById('school-form') || {}).value || huidigSchool;
+  var listType = pijler==='w' ? 'welzijn' : pijler==='i' ? 'incidenten' : 'veiligheid';
+  var listId = CFG.lists[listType + '_' + school];
+  var now = new Date();
+  var pfxMap = {AO:'AO',EH:'EH',LO:'LO',RI:'RI',WE:'WE',AG:'AG',ES:'ES'};
+  var ref = (pfxMap[prefix]||'ME') + '-' + now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(Math.floor(Math.random()*90)+10);
 
-  // Opslaan in SharePoint
+  // 1. Opslaan in SharePoint
   if (listId && listId !== 'PLACEHOLDER') {
     try {
-      const naam = document.getElementById('ao-naam')?.value || huidigUser?.name || '—';
-      const omschr = document.getElementById('ao-omschr')?.value || '—';
+      var naam = (document.getElementById('ao-naam') || {}).value || (huidigUser && huidigUser.name) || 'onbekend';
+      var omschr = (document.getElementById('ao-omschr') || {}).value || '—';
       await graphPost('/sites/' + CFG.siteId + '/lists/' + listId + '/items', {
         fields: { Title:ref, TypeMelding:prefix, School:school, Naam:naam,
           Omschrijving:omschr, Status:'In behandeling',
-          Ingediend:now.toISOString(), IngediendDoor:huidigUser?.username||'—' }
+          Ingediend:now.toISOString(), IngediendDoor:(huidigUser && huidigUser.username) || '—' }
       });
     } catch(e) { console.error('SharePoint fout:', e.message); }
   }
 
-  const directieEmail = CFG.directieEmails[school];
+  var directieEmail = CFG.directieEmails[school];
 
-  // 1. E-mail naar directie (niet bij welzijn en niet bij risico)
+  // 2. E-mail naar directie (niet bij welzijn of risico)
   if (directieEmail && prefix !== 'RI' && prefix !== 'WE') {
     try {
-      var dBody = 'Nieuwe melding ingediend via LON-Meldpunt.\n\nReferentie: ' + ref + '\nType: ' + prefix + '\nSchool: ' + schoolNaam(school) + '\nDatum: ' + now.toLocaleDateString('nl-BE') + '\nIngediend door: ' + (huidigUser?.name||'—') + '\n\nBeheerspaneel: https://lon-ka.github.io/LON-Meldpunt-2026/beheer.html\n\nTip: kopieer en plak de URL indien de link niet werkt.';
-      await graphPost('/me/sendMail', {
-        message:{ subject:'[LON-Meldpunt] Nieuwe melding: ' + prefix + ' — ' + schoolNaam(school),
-          body:{contentType:'Text', content:dBody},
-          toRecipients:[{emailAddress:{address:directieEmail}}]
-        }, saveToSentItems:false
-      });
+      var dBody = 'Nieuwe melding ingediend via LON-Meldpunt.\n\nReferentie: ' + ref + '\nType: ' + prefix + '\nSchool: ' + schoolNaam(school) + '\nDatum: ' + now.toLocaleDateString('nl-BE') + '\nIngediend door: ' + ((huidigUser && huidigUser.name) || '—') + '\n\nBeheerspaneel: https://lon-ka.github.io/LON-Meldpunt-2026/beheer.html\n(Kopieer en plak de URL indien de link niet werkt.)';
+      await graphPost('/me/sendMail', { message:{ subject:'[LON-Meldpunt] Nieuwe melding: ' + prefix + ' — ' + schoolNaam(school), body:{contentType:'Text',content:dBody}, toRecipients:[{emailAddress:{address:directieEmail}}] }, saveToSentItems:false });
     } catch(e) {}
   }
 
-  // 2. CC naar Rita (niet bij welzijn en niet bij risico)
+  // 3. CC naar Rita (niet bij welzijn of risico)
   if (prefix !== 'RI' && prefix !== 'WE') {
     try {
-      var rBody = 'CC: nieuwe melding via LON-Meldpunt.\n\nReferentie: ' + ref + '\nType: ' + prefix + '\nSchool: ' + schoolNaam(school) + '\nIngediend door: ' + (huidigUser?.name||'—') + '\n\nBeheerspaneel: https://lon-ka.github.io/LON-Meldpunt-2026/beheer.html.';
-      await graphPost('/me/sendMail', {
-        message:{ subject:'[LON-Meldpunt] CC melding: ' + prefix + ' — ' + schoolNaam(school),
-          body:{contentType:'Text', content:rBody},
-          toRecipients:[{emailAddress:{address: + rita_email + }}]
-        }, saveToSentItems:false
-      });
+      var rBody = 'CC melding via LON-Meldpunt.\n\nReferentie: ' + ref + '\nType: ' + prefix + '\nSchool: ' + schoolNaam(school) + '\nIngediend door: ' + ((huidigUser && huidigUser.name) || '—') + '\n\nBeheerspaneel: https://lon-ka.github.io/LON-Meldpunt-2026/beheer.html';
+      await graphPost('/me/sendMail', { message:{ subject:'[LON-Meldpunt] CC: ' + prefix + ' — ' + schoolNaam(school), body:{contentType:'Text',content:rBody}, toRecipients:[{emailAddress:{address:'secretariaatlonka@centrumschool.londerzeel.be'}}] }, saveToSentItems:false });
     } catch(e) {}
   }
 
-  // 3. Bevestigingsmail naar melder (niet bij welzijn)
-  if (huidigUser?.username && prefix !== 'WE') {
+  // 4. Bevestigingsmail naar melder (niet bij welzijn)
+  if (huidigUser && huidigUser.username && prefix !== 'WE') {
     try {
-      var bBody = 'Beste ' + (huidigUser.name||'') + '\n\nJe melding werd succesvol ingediend.\n\nReferentie: ' + ref + '\nType: ' + prefix + '\nSchool: ' + schoolNaam(school) + '\nDatum: ' + now.toLocaleDateString('nl-BE') + '\n\n' + (MSGS[prefix]||'') + '\n\nMet vriendelijke groeten,\nHet LON-Meldpunt-systeem';
-      await graphPost('/me/sendMail', {
-        message:{ subject:'[LON-Meldpunt] Bevestiging melding ' + ref,
-          body:{contentType:'Text', content:bBody},
-          toRecipients:[{emailAddress:{address:huidigUser.username}}]
-        }, saveToSentItems:false
-      });
+      var bBody = 'Beste ' + (huidigUser.name || '') + ',\n\nJe melding werd succesvol ingediend.\n\nReferentie: ' + ref + '\nType: ' + prefix + '\nSchool: ' + schoolNaam(school) + '\nDatum: ' + now.toLocaleDateString('nl-BE') + '\n\n' + (MSGS[prefix] || '') + '\n\nMet vriendelijke groeten,\nHet LON-Meldpunt-systeem';
+      await graphPost('/me/sendMail', { message:{ subject:'[LON-Meldpunt] Bevestiging melding ' + ref, body:{contentType:'Text',content:bBody}, toRecipients:[{emailAddress:{address:huidigUser.username}}] }, saveToSentItems:false });
     } catch(e) {}
   }
 
   // Toon success
-  document.querySelectorAll('.form-body').forEach(f=>f.style.display='none');
+  document.querySelectorAll('.form-body').forEach(function(f){f.style.display='none';});
   document.getElementById('s-msg').textContent = (MSGS[prefix]||'Melding ontvangen.') + ' Je ontvangt een bevestigingsmail.';
   document.getElementById('s-ref').textContent = 'Ref: ' + ref;
   document.getElementById('s-ref').className = 'rpill ' + (pijler||'v');
-  document.getElementById('s-ic').textContent = prefix==='ES'?'🆘':pijler==='w'?'🔒':'✅';
+  document.getElementById('s-ic').textContent = prefix==='ES' ? '🆘' : pijler==='w' ? '🔒' : '✅';
   document.getElementById('success').style.display = 'block';
 }
-
 
 async function laadMijn() {
   const email = huidigUser?.username?.toLowerCase()||'';
