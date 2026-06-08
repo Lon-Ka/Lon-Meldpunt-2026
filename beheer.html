@@ -356,13 +356,13 @@ async function initApp(acc) {
     document.getElementById('nav-welzijn').style.display='none';
   }
   // AGODI actiekolom: enkel voor admin en staf
-  if (['admin','staf'].includes(huidigeBeheerder.rol)) {
-    document.getElementById('ao-acties-hdr').style.display='';
+  var aoHdr = document.getElementById('ao-acties-hdr');
+  if (aoHdr && ['admin','staf'].includes(huidigeBeheerder.rol)) {
+    aoHdr.style.display='';
   }
-  // LO verzekeringskolom: voor admin, staf en secretariaat
-  // Werkopdracht knop: voor admin, staf en secretariaat
-  if (['admin','staf','secretariaat'].includes(huidigeBeheerder.rol)) {
-    document.getElementById('wo-nieuw-btn').style.display='block';
+  var woBtn = document.getElementById('wo-nieuw-btn');
+  if (woBtn && ['admin','staf','secretariaat'].includes(huidigeBeheerder.rol)) {
+    woBtn.style.display='block';
   }
 
   laadDashboard();
