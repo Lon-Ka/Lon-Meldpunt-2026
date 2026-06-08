@@ -333,7 +333,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:var(--blauw-bg)}
       <div class="fsec"><div class="fsec-t">Welzijnsmelding</div>
         <div class="frow"><div class="ff"><label>School</label><select><option>CS — Lijsterstraat</option><option>CS — Stationsstraat</option><option>Kouterschool</option><option>School Ter Elst</option></select></div><div class="ff"><label>Type welzijnsmelding</label><select><option>Pestgedrag</option><option>Psychosociaal / burn-out</option><option>Grensoverschrijdend gedrag (GOG)</option></select></div></div>
         <div class="frow"><div class="ff"><label>Anonieme situatiebeschrijving</label><textarea placeholder="Beschrijf de situatie. Vermijd namen in dit veld."></textarea></div></div>
-        <div class="frow"><div class="ff"><label>Identiteit betrokkene (strikt vertrouwelijk)</label><input type="text" placeholder="Naam betrokkene"><div class="fnote">🔒 Strikt vertrouwelijk — enkel directie en vertrouwenspersoon</div></div><div class="ff"><label>Toewijzen aan</label><select><option>Zorgcoördinator (school)</option><option>Directie</option><option>Externe vertrouwenspersoon</option><option>CLB</option></select></div></div>
+        <div class="frow"><div class="ff"><label>Identiteit betrokkene (strikt vertrouwelijk)</label><input type="text" placeholder="Naam betrokkene"><div class="fnote">🔒 Strikt vertrouwelijk — enkel directie en vertrouwenspersoon</div></div><div class="ff"><label>Toewijzing</label><div style="font-size:11px;color:var(--muted);padding:7px 9px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);line-height:1.5">🔒 Je melding wordt vertrouwelijk doorgestuurd naar de vertrouwenspersoon van jouw school.</div></div></div>
       </div>
       <div class="fsec"><div class="fsec-t">GDPR-toestemming</div>
         <div class="cbox"><div class="crow"><input type="checkbox" id="wc1" checked><label for="wc1">Ik bevestig dat deze vertrouwelijke melding enkel wordt verwerkt door bevoegde personen conform het <a onclick="window.open('gdpr.html','_blank')">privacybeleid van LON</a>.</label></div></div>
@@ -435,8 +435,10 @@ const CFG = {
     { sleutel:'ko',  naam:'Kouterschool' },
     { sleutel:'te',  naam:'School Ter Elst' },
   ],
+  beheerUrl: 'https://lon-ka.github.io/LON-Meldpunt-2026/beheer.html',
   org: 'LON-Meldpunt',
   ritaEmail: 'secretariaatlonka@centrumschool.londerzeel.be',
+  beheerUrl: 'https://lon-ka.github.io/LON-Meldpunt-2026/beheer.html',
   org: 'LON-Meldpunt',
   ritaEmail: 'secretariaatlonka@centrumschool.londerzeel.be',
   directieEmails: {
@@ -447,7 +449,7 @@ const CFG = {
   },
 };
 
-const msalCfg = { auth:{ clientId:CFG.clientId, authority:`https://login.microsoftonline.com/${CFG.tenantId}`, redirectUri:CFG.redirectUri }, cache:{ cacheLocation:'sessionStorage' } };
+const msalCfg = { auth:{ clientId:CFG.clientId, authority:`https://login.microsoftonline.com/${CFG.tenantId}`, redirectUri:CFG.redirectUri }, cache:{ cacheLocation:'localStorage' } };
 const msalClient = new msal.PublicClientApplication(msalCfg);
 let token = null, huidigUser = null, huidigSchool = 'csl', huidigPijler = null;
 let gCounts={}, fCounts={};
@@ -670,7 +672,19 @@ async function doSubmit(prefix, pijler) {
 
   var directieEmail = CFG.directieEmails[school];
 
-  // 2. E-mail naar directie (niet bij welzijn of risico)
+  // 2a. Welzijn: stuur naar vertrouwenspersoon van de school
+  if (prefix === 'WE' && CFG.lists.beheerders && CFG.lists.beheerders !== 'PLACEHOLDER') {
+    try {
+      var vpData = await graphGet('/sites/' + CFG.siteId + '/lists/' + CFG.lists.beheerders + '/items?$expand=fields&$top=100');
+      var vpItem = vpData.value.find(function(i){ return i.fields.Rol === 'vertrouwenspersoon' && (i.fields.School === school || !i.fields.School) && i.fields.Actief !== false; });
+      if (vpItem && vpItem.fields.Email) {
+        var vpBody = '[VERTROUWELIJK] Nieuwe welzijnsmelding ingediend via LON-Meldpunt.\n\nReferentie: ' + ref + '\nSchool: ' + schoolNaam(school) + '\nDatum: ' + now.toLocaleDateString('nl-BE') + '\n\nRaadpleeg het beheerspaneel voor de details:\nhttps://lon-ka.github.io/LON-Meldpunt-2026/beheer.html\n\nDit bericht is strikt vertrouwelijk.';
+        await graphPost('/me/sendMail', { message:{ subject:'[Vertrouwelijk] Nieuwe welzijnsmelding — ' + schoolNaam(school), body:{contentType:'Text',content:vpBody}, toRecipients:[{emailAddress:{address:vpItem.fields.Email}}] }, saveToSentItems:false });
+      }
+    } catch(e) { console.error('VP e-mail fout:', e.message); }
+  }
+
+  // 2b. E-mail naar directie (niet bij welzijn of risico)
   if (directieEmail && prefix !== 'RI' && prefix !== 'WE') {
     try {
       var dBody = 'Nieuwe melding ingediend via LON-Meldpunt.\n\nReferentie: ' + ref + '\nType: ' + prefix + '\nSchool: ' + schoolNaam(school) + '\nDatum: ' + now.toLocaleDateString('nl-BE') + '\nIngediend door: ' + ((huidigUser && huidigUser.name) || '—') + '\n\nBeheerspaneel: https://lon-ka.github.io/LON-Meldpunt-2026/beheer.html\n(Kopieer en plak de URL indien de link niet werkt.)';

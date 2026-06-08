@@ -307,7 +307,7 @@ const CFG = {
   ],
 };
 
-const msalCfg = { auth:{ clientId:CFG.clientId, authority:`https://login.microsoftonline.com/${CFG.tenantId}`, redirectUri:CFG.redirectUri }, cache:{ cacheLocation:'sessionStorage' } };
+const msalCfg = { auth:{ clientId:CFG.clientId, authority:`https://login.microsoftonline.com/${CFG.tenantId}`, redirectUri:CFG.redirectUri }, cache:{ cacheLocation:'localStorage' } };
 const msalClient = new msal.PublicClientApplication(msalCfg);
 let token = null, huidigeBeheerder = null, huidigSchool = '';
 
@@ -346,13 +346,13 @@ async function initApp(acc) {
   document.getElementById('b-av').textContent = avText;
 
   // Beperk schoolfilter als directie van 1 school
-  if (['directie','zorg','secretariaat'].includes(huidigeBeheerder.rol) && huidigeBeheerder.school) {
+  if (['directie','zorg','secretariaat','vertrouwenspersoon'].includes(huidigeBeheerder.rol) && huidigeBeheerder.school) {
     const sf = document.getElementById('school-filter');
     sf.value = huidigeBeheerder.school; sf.disabled = true;
     huidigSchool = huidigeBeheerder.school;
   }
   // Verberg welzijn voor niet-geautoriseerden
-  if (!['admin','directie','zorg','staf'].includes(huidigeBeheerder.rol)) {
+  if (!['admin','directie','zorg','staf','vertrouwenspersoon'].includes(huidigeBeheerder.rol)) {
     document.getElementById('nav-welzijn').style.display='none';
   }
   // AGODI actiekolom: enkel voor admin en staf
