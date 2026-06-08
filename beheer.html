@@ -229,9 +229,9 @@ tr:last-child td{border-bottom:none}tr:hover td{background:var(--blauw-bg)}
 
     <!-- WELZIJN -->
     <div class="screen" id="screen-welzijn">
-      <div class="alert al-pk">🔒 Vertrouwelijke module — uitsluitend zichtbaar voor directie en aangewezen zorgcoördinatoren. Alle toegangen worden gelogd.</div>
+      <div class="alert al-pk">🔒 Vertrouwelijke module — uitsluitend zichtbaar voor de vertrouwenspersoon van de betreffende school. Directie en zorgcoördinatoren hebben geen toegang. Alle toegangen worden gelogd.</div>
       <div class="tw"><table><colgroup><col style="width:90px"><col style="width:100px"><col style="width:120px"><col style="width:110px"><col style="width:90px"></colgroup>
-        <tr><th>Ref</th><th>Type</th><th>School</th><th>Toegewezen aan</th><th>Status</th></tr>
+        <tr><th>Ref</th><th>Type</th><th>School</th><th>Ingediend</th><th>Status</th></tr>
         <tbody id="w-tabel"><tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">Laden…</td></tr></tbody>
       </table></div>
     </div>
@@ -663,7 +663,7 @@ async function laadWelzijn() {
   welzijnItems = await laadLijst('welzijn','welzijn');
   document.getElementById('w-tabel').innerHTML = welzijnItems.map((i,idx)=>`<tr onclick='openDossier(window.welzijnItems[${idx}],"WE")' style='cursor:pointer'>
     <td class="cl">${ref('WE',idx+1)}</td><td>${i.TypeMelding||'—'}</td>
-    <td>${schoolNaam(i._school)}</td><td>${i.Toegewezen||'—'}</td><td>${statusBadge(i.Status)}</td></tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">Geen welzijnsdossiers</td></tr>';
+    <td>${schoolNaam(i._school)}</td><td>${i.Ingediend?new Date(i.Ingediend).toLocaleDateString('nl-BE'):'—'}</td><td>${statusBadge(i.Status)}</td></tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">Geen welzijnsdossiers</td></tr>';
 }
 async function laadIncidenten() {
   incidentItems = await laadLijst('inc','incidenten');
