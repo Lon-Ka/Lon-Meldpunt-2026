@@ -137,6 +137,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:var(--blauw-bg)}
   <div class="nav-lbl">Incidenten</div>
   <div class="ni i" id="nav-inc" onclick="show('inc')">🚨 Incidenten</div>
   <div class="nav-lbl">Beheer</div>
+  <div class="ni" id="nav-maatregelen" onclick="show('maatregelen')">📋 Maatregelen</div>
   <div class="ni" id="nav-rapport" onclick="show('rapport')">📈 Rapportering</div>
   <div class="ni" id="nav-beheerders" onclick="show('beheerders')">👥 Beheerders</div>
   <div class="role-bar">
@@ -252,6 +253,35 @@ tr:last-child td{border-bottom:none}tr:hover td{background:var(--blauw-bg)}
       <div id="inc-ag" style="display:none"><p style="font-size:12px;color:var(--muted);padding:20px">Enkel agressiemeldingen</p></div>
     </div>
 
+    <!-- MAATREGELEN -->
+    <div class="screen" id="screen-maatregelen">
+      <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
+        <div class="kpi"><div class="kpi-l">Totaal maatregelen</div><div class="kpi-v kv-b" id="m-totaal">—</div></div>
+        <div class="kpi"><div class="kpi-l">Effectief afgerond</div><div class="kpi-v kv-g" id="m-ef">—</div></div>
+        <div class="kpi"><div class="kpi-l">Nog in opvolging</div><div class="kpi-v kv-a" id="m-open">—</div></div>
+      </div>
+      <div class="tw" style="margin-top:4px">
+        <table><colgroup>
+          <col style="width:90px"><col style="width:100px"><col style="width:120px">
+          <col style="width:180px"><col style="width:180px"><col style="width:80px"><col style="width:90px">
+        </colgroup>
+        <tr>
+          <th>Ref</th><th>Type</th><th>School</th>
+          <th>Preventieve maatregel</th><th>Corrigerende maatregel</th>
+          <th>Ernstgraad</th><th>Status</th>
+        </tr>
+        <tbody id="m-tabel"><tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">Laden…</td></tr></tbody>
+        </table>
+      </div>
+      <div style="margin-top:12px">
+        <div class="bar-lbl">Effectiviteit per ernstgraad</div>
+        <div id="m-bars"><div style="font-size:12px;color:var(--muted)">Laden…</div></div>
+      </div>
+      <div style="margin-top:14px">
+        <button class="btn" onclick="exportMaatregelen()">⬇ Export maatregelen Excel</button>
+      </div>
+    </div>
+
     <!-- RAPPORTERING -->
     <div class="screen" id="screen-rapport">
       <div class="kpi-grid">
@@ -336,6 +366,16 @@ tr:last-child td{border-bottom:none}tr:hover td{background:var(--blauw-bg)}
       <div style="margin-bottom:12px">
         <label style="font-size:11px;color:var(--muted);font-weight:600;display:block;margin-bottom:3px">Corrigerende maatregelen</label>
         <textarea id="modal-corrigerend" style="width:100%;font-family:inherit;font-size:12px;background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:8px 10px;min-height:60px;resize:vertical;outline:none" placeholder="Welke directe herstelacties zijn of worden uitgevoerd?"></textarea>
+      </div>
+
+      <div style="margin-bottom:12px">
+        <label style="font-size:11px;color:var(--muted);font-weight:600;display:block;margin-bottom:3px">Effectiviteit van de maatregelen</label>
+        <select id="modal-effectiviteit" style="width:100%;font-size:12px;font-family:inherit;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 9px;outline:none">
+          <option value="">— Nog niet beoordeeld —</option>
+          <option value="Effectief">✅ Effectief — herhaling voorkomen</option>
+          <option value="Gedeeltelijk">⚠️ Gedeeltelijk — verdere opvolging nodig</option>
+          <option value="Niet effectief">❌ Niet effectief — bijsturing vereist</option>
+        </select>
       </div>
 
       <div style="display:flex;justify-content:flex-end">
@@ -541,9 +581,10 @@ function show(s) {
   document.getElementById(`screen-${s}`).classList.add('active');
   document.querySelectorAll('.ni').forEach(el=>el.classList.remove('active'));
   document.getElementById(`nav-${s}`)?.classList.add('active');
-  const titels = {db:'Dashboard',ao:'Arbeidsongevallen',ehbo:'EHBO-registraties',lo:'Leerlingenongevallen',ri:'Risico-meldingen',welzijn:'Welzijn — vertrouwelijk',inc:'Incidenten',rapport:'Rapportering',beheerders:'Beheerders',notif:'Notificaties'};
+  const titels = {db:'Dashboard',ao:'Arbeidsongevallen',maatregelen:'Maatregelen & effectiviteit',ehbo:'EHBO-registraties',lo:'Leerlingenongevallen',ri:'Risico-meldingen',welzijn:'Welzijn — vertrouwelijk',inc:'Incidenten',rapport:'Rapportering',beheerders:'Beheerders',notif:'Notificaties'};
   document.getElementById('tb-t').textContent = titels[s]||s;
   if (s==='ao') laadAO();
+  if (s==='maatregelen') laadMaatregelen();
   if (s==='welzijn') laadWelzijn();
   if (s==='inc') laadIncidenten();
   if (s==='ri') laadRisico();
@@ -678,6 +719,7 @@ function openDossier(item, type) {
     ['Ernst', item.Ernst || '—'],
     ['Preventieve maatregelen', item.PreventiefMaatregel || '—'],
     ['Corrigerende maatregelen', item.CorrigerendMaatregel || '—'],
+    ['Effectiviteit maatregelen', item.Effectiviteit || '—'],
     ['Opvolging', item.Opvolging || '—'],
   ].filter(function(r){ return r[1] && r[1] !== '—'; });
 
@@ -697,6 +739,8 @@ function openDossier(item, type) {
   document.getElementById('modal-notitie').value = item.Opvolging || '';
   document.getElementById('modal-preventief').value = item.PreventiefMaatregel || '';
   document.getElementById('modal-corrigerend').value = item.CorrigerendMaatregel || '';
+  var efEl = document.getElementById('modal-effectiviteit');
+  if (efEl) efEl.value = item.Effectiviteit || '';
   document.getElementById('modal-overlay').style.display = 'block';
 }
 
@@ -716,13 +760,71 @@ async function slaOpvolgingOp() {
         Opvolging: notitie,
         Ernst: ernst,
         PreventiefMaatregel: preventief,
-        CorrigerendMaatregel: corrigerend
+        CorrigerendMaatregel: corrigerend,
+        Effectiviteit: document.getElementById('modal-effectiviteit').value
       }
     });
     alert('Opvolging opgeslagen.');
     document.getElementById('modal-overlay').style.display = 'none';
     laadDashboard();
   } catch(e) { alert('Fout bij opslaan: ' + e.message); }
+}
+
+async function laadMaatregelen() {
+  const scholen = huidigSchoolFilter ? huidigSchoolFilter : (huidigSchool && huidigSchool !== 'hk_dk' ? [huidigSchool] : CFG.scholen.map(s=>s.sleutel));
+  const tbody = document.getElementById('m-tabel');
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">Laden…</td></tr>';
+  const items = [];
+  for (const sk of scholen) {
+    for (const type of ['veiligheid','incidenten']) {
+      const key = type + '_' + sk;
+      if (!CFG.lists[key] || CFG.lists[key]==='PLACEHOLDER') continue;
+      try {
+        const r = await graphGet(`/sites/${CFG.siteId}/lists/${CFG.lists[key]}/items?$expand=fields&$top=200`);
+        r.value.filter(i => i.fields.PreventiefMaatregel || i.fields.CorrigerendMaatregel).forEach(i => {
+          items.push({...i.fields, _school:sk, _listId:CFG.lists[key], _itemId:i.id});
+        });
+      } catch(e) {}
+    }
+  }
+
+  // KPI
+  document.getElementById('m-totaal').textContent = items.length;
+  document.getElementById('m-ef').textContent = items.filter(i=>i.Status==='Afgewerkt'||i.Status==='Afgesloten').length;
+  document.getElementById('m-open').textContent = items.filter(i=>i.Status!=='Afgewerkt'&&i.Status!=='Afgesloten').length;
+
+  // Tabel
+  const ernstKleur = {'Laag':'b-grn','Gemiddeld':'b-amb','Hoog':'b-amb','Kritiek':'b-red'};
+  tbody.innerHTML = items.length ? items.map((i,idx) => `<tr onclick="openDossier(window.maatItems[${idx}],'${i.TypeMelding||'ME'}')" style="cursor:pointer">
+    <td class="cl">${i.Title||'—'}</td>
+    <td>${i.TypeMelding||'—'}</td>
+    <td>${schoolNaam(i._school)}</td>
+    <td style="white-space:normal;line-height:1.4;font-size:11px">${i.PreventiefMaatregel||'—'}</td>
+    <td style="white-space:normal;line-height:1.4;font-size:11px">${i.CorrigerendMaatregel||'—'}</td>
+    <td>${i.Ernst?`<span class="badge ${ernstKleur[i.Ernst]||'b-muted'}">${i.Ernst}</span>`:'—'}</td>
+    <td>${statusBadge(i.Status)}</td>
+  </tr>`).join('') : '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">Geen maatregelen geregistreerd</td></tr>';
+  window.maatItems = items;
+
+  // Effectiviteitsbars per ernstgraad
+  const graden = ['Kritiek','Hoog','Gemiddeld','Laag'];
+  const kleuren = {'Kritiek':'var(--red)','Hoog':'var(--amb)','Gemiddeld':'#f0a800','Laag':'var(--grn)'};
+  const barsEl = document.getElementById('m-bars');
+  barsEl.innerHTML = graden.map(g => {
+    const sub = items.filter(i=>i.Ernst===g);
+    if (sub.length===0) return '';
+    const ef = sub.filter(i=>i.Status==='Afgewerkt'||i.Status==='Afgesloten').length;
+    const pct = Math.round(ef/sub.length*100);
+    return `<div class="brow2">
+      <span class="blbl">${g} (${sub.length})</span>
+      <div class="btrack"><div class="bfill" style="width:${pct}%;background:${kleuren[g]}"></div></div>
+      <span class="bval" style="color:${kleuren[g]}">${pct}%</span>
+    </div>`;
+  }).join('') || '<div style="font-size:12px;color:var(--muted)">Nog geen ernstgraden toegekend</div>';
+}
+
+function exportMaatregelen() {
+  alert('Export maatregelen — koppelen aan Office Scripts of Power Automate');
 }
 
 function exportExcel() { alert('Export functie — koppelen aan Office Scripts of Power Automate flow'); }
