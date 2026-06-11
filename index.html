@@ -676,7 +676,7 @@ async function doSubmit(prefix, pijler) {
   if (prefix === 'WE' && CFG.lists.beheerders && CFG.lists.beheerders !== 'PLACEHOLDER') {
     try {
       var vpData = await graphGet('/sites/' + CFG.siteId + '/lists/' + CFG.lists.beheerders + '/items?$expand=fields&$top=100');
-      var vpItem = vpData.value.find(function(i){ return i.fields.Rol === 'vertrouwenspersoon' && (i.fields.School === school || !i.fields.School) && i.fields.Actief !== false; });
+      var vpItem = vpData.value.find(function(i){ return i.fields.Rol === 'vertrouwenspersoon' && (i.fields.School === school || !i.fields.School || i.fields.School === 'alle') && i.fields.Actief !== false; });
       if (vpItem && vpItem.fields.Email) {
         var vpBody = '[VERTROUWELIJK] Nieuwe welzijnsmelding ingediend via LON-Meldpunt.\n\nReferentie: ' + ref + '\nSchool: ' + schoolNaam(school) + '\nDatum: ' + now.toLocaleDateString('nl-BE') + '\n\nRaadpleeg het beheerspaneel voor de details:\nhttps://lon-ka.github.io/LON-Meldpunt-2026/beheer.html\n\nDit bericht is strikt vertrouwelijk.';
         await graphPost('/me/sendMail', { message:{ subject:'[Vertrouwelijk] Nieuwe welzijnsmelding — ' + schoolNaam(school), body:{contentType:'Text',content:vpBody}, toRecipients:[{emailAddress:{address:vpItem.fields.Email}}] }, saveToSentItems:false });

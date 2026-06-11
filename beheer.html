@@ -440,12 +440,12 @@ async function initApp(acc) {
   document.getElementById('login-wrap').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   document.getElementById('b-naam').textContent = huidigeBeheerder.naam;
-  document.getElementById('b-rol').textContent = huidigeBeheerder.rol + (huidigeBeheerder.school ? ` — ${schoolNaam(huidigeBeheerder.school)}` : '');
+  document.getElementById('b-rol').textContent = huidigeBeheerder.rol + ((huidigeBeheerder.school && huidigeBeheerder.school !== 'alle') ? ` — ${schoolNaam(huidigeBeheerder.school)}` : '');
   const avText = (huidigeBeheerder.naam||'?').split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
   document.getElementById('b-av').textContent = avText;
 
   // Beperk schoolfilter als directie van 1 school
-  if (['directie','zorg','secretariaat','vertrouwenspersoon'].includes(huidigeBeheerder.rol) && huidigeBeheerder.school) {
+  if (['directie','zorg','secretariaat','vertrouwenspersoon'].includes(huidigeBeheerder.rol) && huidigeBeheerder.school && huidigeBeheerder.school !== 'alle') {
     const sf = document.getElementById('school-filter');
     sf.value = huidigeBeheerder.school; sf.disabled = true;
     huidigSchool = huidigeBeheerder.school;
